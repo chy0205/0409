@@ -1,0 +1,9 @@
+點開:
+
+終端機 : python -m http.server 8000
+
+抽獎網站網址 : http://localhost:8000
+
+查詢中獎網址 : https://dennis23100.github.io/google_auto_lottery/index.html
+
+github查詢&相關程式碼 : https://github.com/dennis23100/google_auto_lottery

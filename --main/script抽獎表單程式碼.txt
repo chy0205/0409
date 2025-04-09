@@ -1,0 +1,228 @@
+/***************************************************************
+  參數設定
+***************************************************************/
+// 假設原報名名單在工作表 "Form_Responses1"
+const SHEET_FORM = 'Form_Responses1';
+
+// 中獎名單工作表
+const SHEET_WINNERS = 'Winners';
+
+// 目標試算表 ID (請替換成你的目標試算表 ID)
+const TARGET_SPREADSHEET_ID = '------中獎表單位置------------';
+
+// 目標工作表名稱 (請替換成你的目標工作表名稱)
+const TARGET_SHEET_NAME = '工作表1';
+
+
+/***************************************************************
+  doGet(e):
+    - 若 ?action=winners => 回傳 Winners 工作表 (中獎名單)
+    - 預設 => 回傳報名名單 (Form_Responses1)
+***************************************************************/
+function doGet(e) {
+  const action = e.parameter.action;
+  if (action === 'winners') {
+    return getWinners();
+  } else {
+    return getFormResponses();
+  }
+}
+
+/** 讀取表單回應 (報名者名單) */
+function getFormResponses() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_FORM);
+    if (!sheet) {
+      return makeJsonOutput([]);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) {
+      // 只有標題列或沒資料
+      return makeJsonOutput([]);
+    }
+    const headers = data[0];
+    const rows = [];
+    for (let i = 1; i < data.length; i++) {
+      let rowObj = {};
+      for (let j = 0; j < headers.length; j++) {
+        rowObj[ headers[j] ] = data[i][j];
+      }
+      rows.push(rowObj);
+    }
+    return makeJsonOutput(rows);
+  } catch (err) {
+    return makeJsonOutput({ error: err.message });
+  }
+}
+
+/** 讀取中獎名單 (Winners) */
+function getWinners() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_WINNERS);
+    if (!sheet) {
+      return makeJsonOutput([]);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    
+    // 標題列拿掉，所以註解
+    // if (data.length < 2) {
+    //   return makeJsonOutput([]);
+    // }
+    // const headers = data[0];  // e.g. [ "中獎時間", "區域(例如:中和1區)", "您的姓名", "編號" ]
+    const rows = [];
+
+    // 從索引 0 開始迭代（包含原本標題列那一行的資料）
+    for (let i = 0; i < data.length; i++) {
+      let rowObj = {};
+      // 假設資料結構仍然與之前相同（包含編號欄位）
+      rowObj["中獎時間"] = data[i][0];
+      rowObj["區域(例如:中和1區)"] = data[i][1];
+      rowObj["您的姓名"] = data[i][2];
+      rowObj["編號"] = data[i][3];
+      rows.push(rowObj);
+    }
+    return makeJsonOutput(rows);
+  } catch (err) {
+    return makeJsonOutput({ error: err.message });
+  }
+}
+
+
+/***************************************************************
+  doPost(e):
+    - 前端抽獎後，把中獎者 [{ region, name }, ...] 傳過來 => 寫入 Winners
+    - 同步資料到另一個試算表 (每次都同步完整的 Winners 資料)
+***************************************************************/
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    const action = body.action;
+
+    if (action === 'clearWinners') {
+      // 清除 Winners 工作表資料
+      return clearWinnersSheet();
+    } else if (action === 'saveWinners') {
+      // 儲存中獎者資料
+      const winners = body.winners;
+
+      if (!Array.isArray(winners) || winners.length === 0) {
+        return makeJsonOutput({ error: "No winners data" });
+      }
+
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(SHEET_WINNERS);
+      if (!sheet) {
+        return makeJsonOutput({ error: `找不到工作表: ${SHEET_WINNERS}` });
+      }
+
+      // 取得目前 Winners 工作表中最後一個編號
+      let lastNumber = getLastWinnerNumber(sheet);
+
+      // 準備要寫入的資料陣列 (包含編號)
+      const dataToAppend = winners.map(winner => [
+        new Date(), // Timestamp
+        winner.region || "",
+        winner.name || "",
+        ++lastNumber // 編號遞增
+      ]);
+
+      // 一次性寫入多列 (包含編號欄)
+      sheet.getRange(sheet.getLastRow() + 1, 1, dataToAppend.length, dataToAppend[0].length).setValues(dataToAppend);
+
+    } // 不要在 else if 裡面呼叫 syncWinnersToAnotherSpreadsheet
+
+    // 無論 action 是什麼，都執行同步操作 (確保每次抽獎後都同步所有資料)
+    syncWinnersToAnotherSpreadsheet();
+
+    return makeJsonOutput({ success: true, message: "Winners saved and synced" });
+
+  } catch (err) {
+    return makeJsonOutput({ error: err.message });
+  }
+}
+
+/** 清除 Winners 工作表資料，且不恢復標題 */
+function clearWinnersSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_WINNERS);
+    if (!sheet) {
+      return makeJsonOutput({ error: `找不到工作表: ${SHEET_WINNERS}` });
+    }
+
+    // 清除所有資料 (移除標題列相關程式碼)
+    sheet.clearContents();
+
+    return makeJsonOutput({ success: true, message: "Winners sheet cleared" });
+  } catch (err) {
+    return makeJsonOutput({ error: err.message });
+  }
+}
+
+/** 輔助：輸出 JSON */
+function makeJsonOutput(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 將中獎資料同步到另一個試算表 (讀取所有 Winners 資料)
+ */
+function syncWinnersToAnotherSpreadsheet() {
+  try {
+    // 開啟來源試算表 (即目前的試算表)
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sourceSheet = ss.getSheetByName(SHEET_WINNERS);
+    if (!sourceSheet) {
+      throw new Error(`找不到來源工作表: ${SHEET_WINNERS}`);
+    }
+
+    // 取得來源工作表的所有資料 (移除標題列相關程式碼)
+    const sourceData = sourceSheet.getDataRange().getValues();
+
+    // 開啟目標試算表
+    const targetSpreadsheet = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+    
+    // 取得目標工作表
+    const targetSheet = targetSpreadsheet.getSheetByName(TARGET_SHEET_NAME);
+    if (!targetSheet) {
+      throw new Error(`找不到目標工作表: ${TARGET_SHEET_NAME}`);
+    }
+
+    // 清空目標工作表所有內容
+    targetSheet.clearContents();
+
+    // 將資料寫入目標工作表 (移除標題列相關程式碼)
+    targetSheet.getRange(1, 1, sourceData.length, sourceData[0].length).setValues(sourceData);
+
+    console.log(`中獎資料已同步到試算表: ${TARGET_SPREADSHEET_ID} 的 ${TARGET_SHEET_NAME} 工作表`);
+  } catch (err) {
+    console.error(`同步資料到另一個試算表時發生錯誤: ${err.message}`);
+  }
+}
+
+/**
+ * 取得 Winners 工作表中最後一個編號
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet Winners 工作表
+ * @return {number} 最後一個編號，如果沒有編號，則返回 0
+ */
+function getLastWinnerNumber(sheet) {
+  const data = sheet.getDataRange().getValues();
+  // if (data.length < 2) {
+  //   return 0; // 沒有資料或只有標題列(標題列拿掉，所以註解)
+  // }
+
+  // 取得 D 欄 (第 4 欄) 的所有資料
+  const numbers = data.map(row => row[3]).filter(Number.isInteger); // 過濾出數字
+
+  if (numbers.length === 0) {
+    return 0; // 沒有編號
+  }
+
+  return Math.max(...numbers); // 取得最大的編號
+}

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>抽獎系統 - 轉盤模式</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      text-align: center;
+      color: #fff;
+      background-color: #000;
+    }
+
+    canvas {
+      margin: 20px auto;
+      display: block;
+      background-color: #fff;
+      border-radius: 50%;
+    }
+
+    #controls {
+      margin: 20px;
+    }
+
+    button {
+      font-size: 1rem;
+      padding: 10px 20px;
+      margin: 10px;
+      cursor: pointer;
+    }
+
+    #winner {
+      margin-top: 20px;
+      font-size: 1.2rem;
+      min-height: 1.5em;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 5px 10px;
+      display: inline-block;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>轉盤抽獎系統</h1>
+
+  <canvas id="wheelCanvas" width="500" height="500"></canvas>
+
+  <div id="controls">
+    <button id="fetchBtn">載入最新名單</button>
+    <button id="spinBtn" disabled>開始轉盤</button>
+  </div>
+
+  <div id="winner">尚未開始抽獎</div>
+
+  <script>
+    // ============================
+    // 全域變數
+    // ============================
+    const SCRIPT_URL = "-----------抽獎表單的網址------------"; // 替換成您的 Web App URL
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const spinBtn = document.getElementById('spinBtn');
+    const winnerDiv = document.getElementById('winner');
+
+    let participants = [];
+    let startAngle = 0;
+    let arc;
+    let spinTimeout = null;
+    let spinAngleStart = 0;
+    let spinTime = 0;
+    let spinTimeTotal = 0;
+
+    // ============================
+    // 從 Google 試算表載入名單
+    // ============================
+    async function fetchParticipants() {
+      try {
+        const resp = await fetch(SCRIPT_URL);
+        if (!resp.ok) throw new Error("讀取名單失敗: " + resp.status);
+        const data = await resp.json();
+        participants = data.map(row => row["您的姓名"]).filter(name => name); // 假設欄位名稱為「您的姓名」
+        if (participants.length > 0) {
+          arc = Math.PI / (participants.length / 2);
+          drawWheel();
+          spinBtn.disabled = false;
+          winnerDiv.textContent = `名單載入完成，共 ${participants.length} 位參加者`;
+        } else {
+          winnerDiv.textContent = '無法載入參加者名單';
+        }
+      } catch (err) {
+        console.error("fetchParticipants error:", err);
+        winnerDiv.textContent = '載入名單失敗';
+      }
+    }
+
+    // ============================
+    // 繪製轉盤
+    // ============================
+    function drawWheel() {
+      const outsideRadius = 200;
+      const textRadius = 160;
+      const insideRadius = 50;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < participants.length; i++) {
+        const angle = startAngle + i * arc;
+        ctx.fillStyle = i % 2 === 0 ? "#FF5733" : "#33C3FF";
+
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, outsideRadius, angle, angle + arc, false);
+        ctx.arc(canvas.width / 2, canvas.height / 2, insideRadius, angle + arc, angle, true);
+        ctx.fill();
+
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        ctx.translate(
+          canvas.width / 2 + Math.cos(angle + arc / 2) * textRadius,
+          canvas.height / 2 + Math.sin(angle + arc / 2) * textRadius
+        );
+        ctx.rotate(angle + arc / 2);
+        const text = participants[i];
+        ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
+        ctx.restore();
+      }
+    }
+
+    // ============================
+    // 旋轉轉盤
+    // ============================
+    function rotateWheel() {
+      spinTime += 30;
+      if (spinTime >= spinTimeTotal) {
+        stopRotateWheel();
+        return;
+      }
+      const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
+      startAngle += (spinAngle * Math.PI) / 180;
+      drawWheel();
+      spinTimeout = requestAnimationFrame(rotateWheel);
+    }
+
+    function stopRotateWheel() {
+      cancelAnimationFrame(spinTimeout);
+      const degrees = (startAngle * 180) / Math.PI + 90;
+      const arcd = (arc * 180) / Math.PI;
+      const index = Math.floor((360 - (degrees % 360)) / arcd) % participants.length;
+
+      winnerDiv.textContent = `恭喜中獎者：${participants[index]}`;
+    }
+
+    function easeOut(t, b, c, d) {
+      const ts = (t /= d) * t;
+      const tc = ts * t;
+      return b + c * (tc + -3 * ts + 3 * t);
+    }
+
+    // ============================
+    // 事件監聽
+    // ============================
+    fetchBtn.addEventListener('click', fetchParticipants);
+
+    spinBtn.addEventListener('click', () => {
+      spinAngleStart = Math.random() * 10 + 10;
+      spinTime = 0;
+      spinTimeTotal = Math.random() * 3000 + 4000;
+      rotateWheel();
+    });
+  </script>
+</body>
+</html>

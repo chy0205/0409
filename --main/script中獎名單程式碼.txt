@@ -1,0 +1,92 @@
+/**
+ * 當試算表更新時，自動將 A 欄 到 D 欄的內容上傳到 GitHub。
+ *
+ */
+function onEdit(e) {
+  // GitHub 設定
+  // *** 注意！這裡直接貼上了你的 Token，請務必在使用後立即修改程式碼，從指令碼屬性中讀取 Token，並更改你的 API Token！***
+  const githubToken = "--------自己的githubToken---------"; // 請修改為你的 Token
+  const repoOwner = "--------自己的github帳號名稱---------";
+  const repoName = "--------自己的github存檔案的資料夾---------";
+  const filePath = "--------自己的github要被上傳的.csv檔---------";
+  const commitMessage = "Update spreadsheet data";
+
+  // 取得試算表資料 (取得 A 欄 到 D 欄)
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("工作表1"); // 根據你的工作表名稱修改
+  const data = sheet.getRange("A1:D" + sheet.getLastRow()).getValues(); // 取得 A1 到 D 欄最後一行的資料
+  Logger.log(data); // 確認 data 變數是否正確取得了 B 欄和 C 欄的資料
+
+  // 將資料轉換為 CSV 格式
+  const csvContent = convertToCsv(data);
+
+  // 上傳到 GitHub
+  uploadToGitHub(githubToken, repoOwner, repoName, filePath, csvContent, commitMessage);
+}
+
+/**
+ * 將二維陣列轉換為 CSV 字串 (使用 UTF-8 編碼)。
+ *
+ * @param {Array<Array<string>>} data - 要轉換的二維陣列。
+ * @returns {string} CSV 字串。
+ */
+function convertToCsv(data) {
+  let csvContent = "";
+  data.forEach(function(row) {
+    // 使用 Utilities.formatString 處理每個儲存格，並用雙引號包起來
+    let rowContent = row.map(cell => Utilities.formatString('"%s"', cell.toString().replace(/"/g, '""'))).join(",");
+    csvContent += rowContent + "\r\n";
+  });
+  return csvContent;
+}
+
+/**
+ * 將文件上傳到 GitHub。
+ *
+ * @param {string} token - GitHub Personal Access Token。
+ * @param {string} owner - 倉庫擁有者。
+ * @param {string} repo - 倉庫名稱。
+ * @param {string} path - 文件路徑。
+ * @param {string} content - 文件內容。
+ * @param {string} message - 提交訊息。
+ */
+function uploadToGitHub(token, owner, repo, path, content, message) {
+  const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+
+  // 取得文件的 SHA (如果文件已存在)
+  let sha = null;
+  const getShaOptions = {
+    "method": "GET",
+    "headers": {
+      "Authorization": `token ${token}`,
+      "Accept": "application/vnd.github.v3+json"
+    }
+  };
+  const getShaResponse = UrlFetchApp.fetch(baseUrl, getShaOptions);
+  if (getShaResponse.getResponseCode() === 200) {
+    sha = JSON.parse(getShaResponse.getContentText()).sha;
+  }
+
+  // 上傳文件
+  const payload = {
+    "message": message,
+    "content": Utilities.base64Encode(content, Utilities.Charset.UTF_8), // 上傳時也使用 UTF-8 編碼
+    "sha": sha // 如果文件已存在，則需要提供 SHA 值以覆蓋
+  };
+  const options = {
+    "method": "PUT",
+    "headers": {
+      "Authorization": `token ${token}`,
+      "Accept": "application/vnd.github.v3+json"
+    },
+    "payload": JSON.stringify(payload)
+  };
+
+  const response = UrlFetchApp.fetch(baseUrl, options);
+
+  if (response.getResponseCode() === 200 || response.getResponseCode() === 201) {
+    Logger.log("文件已成功上傳到 GitHub！");
+  } else {
+    Logger.log("上傳失敗：" + response.getContentText());
+  }
+}
