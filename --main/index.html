@@ -62,6 +62,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             padding: 5px;
+            font-size: 1rem; /* 預設字體大小，會在 JavaScript 中調整 */
         }
 
         /* 指針樣式 */
@@ -170,7 +171,7 @@
         // ============================
         // 參數與全域變數
         // ============================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwObTZINZWxiq2w2Nril5KbtV3VOSdghyWhXCMwLaRSjLPWKBb_ATom31Ba--XNTtmSoA/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwObTZINZWxiq2w2Nril5KbtV3VOSdghyWhXCMwLaRSjLPWKBb_ATom31Ba--XNTtmSoA/exec"; // 替換成您的 Google Apps Script URL
         const COL_B_NAME = "區域(例如:中和1區)";
         const COL_C_NAME = "您的姓名";
         const COLORS = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50']; // 十個顏色
@@ -286,7 +287,7 @@
                 const slice = document.createElement('div');
                 slice.classList.add('wheel-slot');
                 slice.style.transform = `rotate(${anglePerSlice * i}deg)`;
-                slice.style.backgroundColor = COLORS[i % COLORS.length]; // 循環使用顏色
+                slice.style.backgroundColor = COLORS[i % COLORS.length];
 
                 const label = document.createElement('span');
                 label.textContent = data[i].name;
