@@ -52,30 +52,30 @@
             justify-content: center;
             align-items: center;
             color: #fff;
-            user-select: none; /* 防止文字被選取 */
-            box-sizing: border-box; /* 確保邊框不影響尺寸 */
+            user-select: none;
+            box-sizing: border-box;
             border: 1px solid #333; /* 可選：添加分隔線 */
         }
 
         .wheel-slot span {
-            white-space: nowrap; /* 防止文字換行 */
-            overflow: hidden; /* 超出部分隱藏 */
-            text-overflow: ellipsis; /* 超出部分顯示省略號 */
-            padding: 5px; /* 增加一些內邊距 */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 5px;
         }
 
         /* 指針樣式 */
         #pointer {
             position: absolute;
             top: 50%;
-            right: -20px; /* 調整指針位置 */
+            right: -20px;
             width: 0;
             height: 0;
             border-left: 20px solid transparent;
             border-right: 20px solid transparent;
-            border-top: 30px solid red; /* 紅色指針 */
+            border-top: 30px solid red;
             transform: translateY(-50%);
-            z-index: 10; /* 確保指針在轉盤之上 */
+            z-index: 10;
         }
 
         /* 中心提示文字樣式 */
@@ -89,7 +89,7 @@
             padding: 10px 20px;
             border-radius: 5px;
             cursor: pointer;
-            z-index: 5; /* 確保文字在轉盤之上 */
+            z-index: 5;
         }
 
         /* 控制區域 */
@@ -173,7 +173,7 @@
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwObTZINZWxiq2w2Nril5KbtV3VOSdghyWhXCMwLaRSjLPWKBb_ATom31Ba--XNTtmSoA/exec";
         const COL_B_NAME = "區域(例如:中和1區)";
         const COL_C_NAME = "您的姓名";
-        const COLORS = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50']; // 顏色陣列 (可以擴充)
+        const COLORS = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50']; // 十個顏色
 
         let participants = [];
         let isSpinning = false;
