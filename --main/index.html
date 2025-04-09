@@ -1,244 +1,337 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>抽獎系統 - 轉盤抽獎</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      text-align: center;
-      color: #fff;
-      background-color: #000;
-    }
+    <meta charset="UTF-8">
+    <title>抽獎系統 - 轉盤抽獎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            text-align: center;
+            color: #fff;
+            background-color: #000;
+        }
 
-    /* 背景影片 */
-    #video-background {
-      position: fixed;
-      right: 0;
-      bottom: 0;
-      min-width: 100%;
-      min-height: 100%;
-      z-index: -1;
-    }
+        /* 背景影片 */
+        #video-background {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            z-index: -1;
+        }
 
-    /* 轉盤容器 */
-    #wheel-container {
-      position: relative;
-      width: 300px;
-      height: 300px;
-      margin: 20px auto;
-    }
+        /* 轉盤容器 */
+        #wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 20px auto;
+        }
 
-    /* 轉盤本身 */
-    #wheel {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background-color: #333;
-      transform-origin: center center;
-      transition: transform 3s ease-out;
-      display: flex;
-      flex-wrap: wrap;
-    }
+        /* 轉盤本身 */
+        #wheel {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: #000; /* 初始為黑色 */
+            transform-origin: center center;
+            transition: transform 3s ease-out;
+        }
 
-    /* 每個格子的樣式 */
-    .wheel-slot {
-      width: 50%;
-      height: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border: 1px solid #fff;
-      background-color: rgba(255, 255, 255, 0.1);
-      box-sizing: border-box;
-    }
+        .wheel-slot {
+            position: absolute;
+            width: 50%;
+            height: 50%;
+            transform-origin: 100% 50%;
+            clip-path: polygon(0 0, 100% 0, 50% 100%, 0 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            user-select: none; /* 防止文字被選取 */
+            box-sizing: border-box; /* 確保邊框不影響尺寸 */
+            border: 1px solid #333; /* 可選：添加分隔線 */
+        }
 
-    /* 控制區域 */
-    #controls {
-      margin: 20px;
-    }
+        .wheel-slot span {
+            white-space: nowrap; /* 防止文字換行 */
+            overflow: hidden; /* 超出部分隱藏 */
+            text-overflow: ellipsis; /* 超出部分顯示省略號 */
+            padding: 5px; /* 增加一些內邊距 */
+        }
 
-    button {
-      font-size: 1rem;
-      padding: 10px 20px;
-      margin: 10px;
-      cursor: pointer;
-    }
+        /* 指針樣式 */
+        #pointer {
+            position: absolute;
+            top: 50%;
+            right: -20px; /* 調整指針位置 */
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 30px solid red; /* 紅色指針 */
+            transform: translateY(-50%);
+            z-index: 10; /* 確保指針在轉盤之上 */
+        }
 
-    #winner {
-      margin-top: 20px;
-      font-size: 1.2rem;
-      background-color: rgba(0, 0, 0, 0.7);
-      padding: 5px 10px;
-      display: inline-block;
-      border-radius: 5px;
-    }
+        /* 中心提示文字樣式 */
+        #center-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 5; /* 確保文字在轉盤之上 */
+        }
 
-    /* 音樂控制 */
-    #musicBtn, #updateMusicBtn {
-      position: fixed;
-      top: 20px;
-      background-color: rgba(0, 0, 0, 0.5);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+        /* 控制區域 */
+        #controls {
+            margin: 20px;
+        }
 
-    #musicBtn {
-      right: 120px;
-    }
+        button {
+            font-size: 1rem;
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
 
-    #updateMusicBtn {
-      right: 20px;
-    }
-  </style>
+        #winner {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            display: inline-block;
+            border-radius: 5px;
+        }
+
+        /* 音樂控制 */
+        #musicBtn, #updateMusicBtn {
+            position: fixed;
+            top: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        #musicBtn {
+            right: 120px;
+        }
+
+        #updateMusicBtn {
+            right: 20px;
+        }
+    </style>
 </head>
 <body>
-  <!-- 背景影片 -->
-  <video autoplay muted loop id="video-background">
-    <source src="bg.mp4" type="video/mp4">
-    你的瀏覽器不支援 HTML5 影片播放。
-  </video>
+    <video autoplay muted loop id="video-background">
+        <source src="bg.mp4" type="video/mp4">
+        你的瀏覽器不支援 HTML5 影片播放。
+    </video>
 
-  <!-- 內容區 -->
-  <div class="content-overlay">
-    <h1>轉盤抽獎系統</h1>
+    <div class="content-overlay">
+        <h1>轉盤抽獎系統</h1>
 
-    <div id="controls">
-      <button id="fetchBtn">載入最新名單</button>
-      <button id="clearDataBtn">清除中獎名單</button>
-      <br><br>
-      <label>一次抽出幾位</label>
-      <input type="number" id="drawCount" value="1" min="1" />
-      <button id="drawBtn">開始抽獎</button>
+        <div id="controls">
+            <button id="fetchBtn">載入最新名單</button>
+            <button id="clearDataBtn" style="display: none;">清除中獎名單</button>
+            <br><br>
+            <label>一次抽出幾位</label>
+            <input type="number" id="drawCount" value="1" min="1" />
+            <button id="drawBtn">開始抽獎</button>
+        </div>
+
+        <div id="wheel-container">
+            <div id="wheel"></div>
+            <div id="pointer"></div>
+            <div id="center-text">按一下以旋轉</div>
+        </div>
+
+        <div id="winner">尚未載入名單</div>
+
+        <audio id="bgMusic" src="bgmusic1.mp3" loop></audio>
+        <button id="musicBtn">播放音樂</button>
+        <button id="updateMusicBtn">更新音樂</button>
     </div>
 
-    <!-- 轉盤 -->
-    <div id="wheel-container">
-      <div id="wheel"></div>
-    </div>
+    <script>
+        // ============================
+        // 參數與全域變數
+        // ============================
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwObTZINZWxiq2w2Nril5KbtV3VOSdghyWhXCMwLaRSjLPWKBb_ATom31Ba--XNTtmSoA/exec";
+        const COL_B_NAME = "區域(例如:中和1區)";
+        const COL_C_NAME = "您的姓名";
+        const COLORS = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50']; // 顏色陣列 (可以擴充)
 
-    <div id="winner">尚未載入名單</div>
+        let participants = [];
+        let isSpinning = false;
 
-    <audio id="bgMusic" src="bgmusic1.mp3" loop></audio>
-    <button id="musicBtn">播放音樂</button>
-    <button id="updateMusicBtn">更新音樂</button>
-  </div>
+        // ============================
+        // 事件監聽與按鈕操作
+        // ============================
+        // 載入最新名單按鈕
+        document.getElementById('fetchBtn').addEventListener('click', async () => {
+            document.getElementById('fetchBtn').style.display = 'none';
+            document.getElementById('clearDataBtn').style.display = 'none';
+            const winnerDiv = document.getElementById('winner');
+            winnerDiv.textContent = "載入中...";
+            const rawData = await fetchDataFromSheet();
+            if (rawData.length === 0) {
+                winnerDiv.textContent = "試算表目前沒有任何資料。";
+                document.getElementById('fetchBtn').style.display = 'block';
+                generateWheel([]); // 傳入空陣列以顯示黑色圓
+                return;
+            }
 
-  <script>
-    // ============================
-    // 參數與全域變數
-    // ============================
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwObTZINZWxiq2w2Nril5KbtV3VOSdghyWhXCMwLaRSjLPWKBb_ATom31Ba--XNTtmSoA/exec";
-    const COL_B_NAME = "區域(例如:中和1區)";
-    const COL_C_NAME = "您的姓名";
+            // 處理資料過濾，並將參加者存儲
+            participants = rawData.filter(item => item[COL_B_NAME] && item[COL_C_NAME])
+                .map(item => ({ name: item[COL_C_NAME], region: item[COL_B_NAME] }));
 
-    let participants = [];
+            winnerDiv.textContent = `已載入 ${participants.length} 位參加者。`;
+            document.getElementById('fetchBtn').style.display = 'block';
+            if (participants.length > 0) {
+                document.getElementById('clearDataBtn').style.display = 'block';
+            }
+            generateWheel(participants); // 使用載入的參與者名單生成轉盤
+        });
 
-    // ============================
-    // 事件監聽與按鈕操作
-    // ============================
-    // 載入最新名單按鈕
-    document.getElementById('fetchBtn').addEventListener('click', async () => {
-      document.getElementById('fetchBtn').style.display = 'none';
-      const winnerDiv = document.getElementById('winner');
-      winnerDiv.textContent = "載入中...";
-      const rawData = await fetchDataFromSheet();
-      if (rawData.length === 0) {
-        winnerDiv.textContent = "試算表目前沒有任何資料。";
-        document.getElementById('fetchBtn').style.display = 'block';
-        return;
-      }
+        // 清除中獎名單按鈕
+        document.getElementById('clearDataBtn').addEventListener('click', () => {
+            participants = [];
+            document.getElementById('winner').textContent = "已清除中獎名單。";
+            generateWheel(participants); // 重新生成一個空的轉盤
+            document.getElementById('clearDataBtn').style.display = 'none';
+        });
 
-      // 處理資料過濾，並將參加者存儲
-      participants = rawData.filter(item => item[COL_B_NAME] && item[COL_C_NAME])
-        .map(item => ({ name: item[COL_C_NAME], region: item[COL_B_NAME] }));
+        // 抽獎按鈕
+        document.getElementById('drawBtn').addEventListener('click', () => {
+            if (isSpinning) return;
+            const winnerDiv = document.getElementById('winner');
+            if (participants.length === 0) {
+                winnerDiv.textContent = "名單已抽完或尚未載入。";
+                return;
+            }
 
-      winnerDiv.textContent = `已載入 ${participants.length} 位參加者。`;
-      document.getElementById('fetchBtn').style.display = 'block';
-      generateWheel();  // 生成轉盤
-    });
+            isSpinning = true;
+            const wheel = document.getElementById('wheel');
+            wheel.style.transition = 'transform 3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // 更平滑的動畫
+            const numSlices = participants.length;
+            const rotation = Math.floor(Math.random() * 3600) + 360 * numSlices; // 旋轉多圈
+            wheel.style.transform = `rotate(${rotation}deg)`;
 
-    // 抽獎按鈕
-    document.getElementById('drawBtn').addEventListener('click', () => {
-      const winnerDiv = document.getElementById('winner');
-      if (participants.length === 0) {
-        winnerDiv.textContent = "名單已抽完或尚未載入。";
-        return;
-      }
+            setTimeout(() => {
+                isSpinning = false;
+                wheel.style.transition = 'none';
+                const finalRotation = rotation % 360;
+                const winningIndex = Math.floor((360 - finalRotation) / (360 / numSlices)); // 計算中獎的扇形索引
 
-      // 只抽出一位
-      const winnerIndex = Math.floor(Math.random() * participants.length);
-      const winner = participants[winnerIndex];
+                const winner = participants[winningIndex % participants.length]; // 取得中獎者
 
-      // 讓轉盤開始旋轉
-      const wheel = document.getElementById('wheel');
-      wheel.style.transition = 'transform 3s ease-out';
-      const randomDegree = Math.floor(Math.random() * 360);
-      wheel.style.transform = `rotate(${randomDegree + 3600}deg)`; // 旋轉多圈，模擬隨機結果
+                winnerDiv.innerHTML = `本次中獎：<span>${winner.region} / ${winner.name}</span>`;
 
-      // 在旋轉結束後顯示中獎者
-      setTimeout(() => {
-        winnerDiv.innerHTML = `本次中獎：<span>${winner.region} / ${winner.name}</span>`;
-        // 刪除已中獎者
-        participants.splice(winnerIndex, 1);
-      }, 3000); // 3秒後顯示結果
-    });
+                // 移除已中獎者 (您可以根據需求調整是否移除)
+                participants.splice(winningIndex % participants.length, 1);
+                generateWheel(participants); // 更新轉盤
 
-    // ============================
-    // 轉盤生成
-    // ============================
-    function generateWheel() {
-      const wheel = document.getElementById('wheel');
-      wheel.innerHTML = '';  // 清空轉盤
+                if (participants.length === 0) {
+                    document.getElementById('clearDataBtn').style.display = 'none';
+                }
+            }, 3300); // 比動畫時間略長
+        });
 
-      const slots = participants.length;
-      const anglePerSlot = 360 / slots;
-      participants.forEach((participant, index) => {
-        const angle = anglePerSlot * index;
+        // 中心文字點擊也觸發抽獎
+        document.getElementById('center-text').addEventListener('click', () => {
+            document.getElementById('drawBtn').click();
+        });
 
-        const slot = document.createElement('div');
-        slot.classList.add('wheel-slot');
-        slot.style.transform = `rotate(${angle}deg)`;
-        slot.innerHTML = `<span>${participant.name}</span>`;
-        wheel.appendChild(slot);
-      });
-    }
+        // ============================
+        // 轉盤生成
+        // ============================
+        function generateWheel(data) {
+            const wheel = document.getElementById('wheel');
+            wheel.innerHTML = ''; // 清空轉盤
 
-    // ============================
-    // 背景音樂控制
-    // ============================
-    const bgMusic = document.getElementById('bgMusic');
-    const musicBtn = document.getElementById('musicBtn');
-    musicBtn.addEventListener('click', () => {
-      if (bgMusic.paused) {
-        bgMusic.play();
-        musicBtn.textContent = "暫停音樂";
-      } else {
-        bgMusic.pause();
-        musicBtn.textContent = "播放音樂";
-      }
-    });
+            const numSlices = data.length;
+            if (numSlices === 0) {
+                wheel.style.backgroundColor = '#000'; // 如果沒有名單，保持黑色
+                return;
+            } else {
+                wheel.style.backgroundColor = '#333'; // 有名單時，可以設置一個底色
+            }
 
-    // ============================
-    // 與後端溝通與資料存取
-    // ============================
-    async function fetchDataFromSheet() {
-      try {
-        const resp = await fetch(SCRIPT_URL);
-        if (!resp.ok) throw new Error("讀取名單失敗: " + resp.status);
-        const data = await resp.json();
-        if (!Array.isArray(data)) return [];
-        return data;
-      } catch (err) {
-        console.error("fetchDataFromSheet error:", err);
-        return [];
-      }
-    }
-  </script>
+            const anglePerSlice = 360 / numSlices;
+
+            // 計算合適的字體大小
+            const calculateFontSize = (numSlices) => {
+                if (numSlices <= 6) return '1.5rem';
+                if (numSlices <= 12) return '1.2rem';
+                if (numSlices <= 20) return '1rem';
+                return '0.8rem';
+            };
+            const fontSize = calculateFontSize(numSlices);
+
+            for (let i = 0; i < numSlices; i++) {
+                const slice = document.createElement('div');
+                slice.classList.add('wheel-slot');
+                slice.style.transform = `rotate(${anglePerSlice * i}deg)`;
+                slice.style.backgroundColor = COLORS[i % COLORS.length]; // 循環使用顏色
+
+                const label = document.createElement('span');
+                label.textContent = data[i].name;
+                label.style.fontSize = fontSize;
+                slice.appendChild(label);
+
+                wheel.appendChild(slice);
+            }
+        }
+
+        // 在頁面載入時，初始化一個黑色的圓
+        generateWheel([]);
+
+        // ============================
+        // 背景音樂控制
+        // ============================
+        const bgMusic = document.getElementById('bgMusic');
+        const musicBtn = document.getElementById('musicBtn');
+        musicBtn.addEventListener('click', () => {
+            if (bgMusic.paused) {
+                bgMusic.play();
+                musicBtn.textContent = "暫停音樂";
+            } else {
+                bgMusic.pause();
+                musicBtn.textContent = "播放音樂";
+            }
+        });
+
+        // ============================
+        // 與後端溝通與資料存取
+        // ============================
+        async function fetchDataFromSheet() {
+            try {
+                const resp = await fetch(SCRIPT_URL);
+                if (!resp.ok) throw new Error("讀取名單失敗: " + resp.status);
+                const data = await resp.json();
+                if (!Array.isArray(data)) return [];
+                return data;
+            } catch (err) {
+                console.error("fetchDataFromSheet error:", err);
+                document.getElementById('winner').textContent = "載入名單失敗，請稍後再試。";
+                document.getElementById('fetchBtn').style.display = 'block';
+                return [];
+            }
+        }
+    </script>
 </body>
 </html>
