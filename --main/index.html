@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>抽獎系統 - 轉盤模式</title>
+  <title>抽獎系統 - 轉盤抽獎</title>
   <style>
     body {
       margin: 0;
@@ -13,13 +13,50 @@
       background-color: #000;
     }
 
-    canvas {
-      margin: 20px auto;
-      display: block;
-      background-color: #fff;
-      border-radius: 50%;
+    /* 背景影片 */
+    #video-background {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      z-index: -1;
     }
 
+    /* 轉盤容器 */
+    #wheel-container {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      margin: 20px auto;
+    }
+
+    /* 轉盤本身 */
+    #wheel {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: #333;
+      transform-origin: center center;
+      transition: transform 3s ease-out;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    /* 每個格子的樣式 */
+    .wheel-slot {
+      width: 50%;
+      height: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #fff;
+      background-color: rgba(255, 255, 255, 0.1);
+      box-sizing: border-box;
+    }
+
+    /* 控制區域 */
     #controls {
       margin: 20px;
     }
@@ -34,141 +71,174 @@
     #winner {
       margin-top: 20px;
       font-size: 1.2rem;
-      min-height: 1.5em;
       background-color: rgba(0, 0, 0, 0.7);
       padding: 5px 10px;
       display: inline-block;
       border-radius: 5px;
     }
+
+    /* 音樂控制 */
+    #musicBtn, #updateMusicBtn {
+      position: fixed;
+      top: 20px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #musicBtn {
+      right: 120px;
+    }
+
+    #updateMusicBtn {
+      right: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>轉盤抽獎系統</h1>
+  <!-- 背景影片 -->
+  <video autoplay muted loop id="video-background">
+    <source src="bg.mp4" type="video/mp4">
+    你的瀏覽器不支援 HTML5 影片播放。
+  </video>
 
-  <canvas id="wheelCanvas" width="500" height="500"></canvas>
+  <!-- 內容區 -->
+  <div class="content-overlay">
+    <h1>轉盤抽獎系統</h1>
 
-  <div id="controls">
-    <button id="fetchBtn">載入最新名單</button>
-    <button id="spinBtn" disabled>開始轉盤</button>
+    <div id="controls">
+      <button id="fetchBtn">載入最新名單</button>
+      <button id="clearDataBtn">清除中獎名單</button>
+      <br><br>
+      <label>一次抽出幾位</label>
+      <input type="number" id="drawCount" value="1" min="1" />
+      <button id="drawBtn">開始抽獎</button>
+    </div>
+
+    <!-- 轉盤 -->
+    <div id="wheel-container">
+      <div id="wheel"></div>
+    </div>
+
+    <div id="winner">尚未載入名單</div>
+
+    <audio id="bgMusic" src="bgmusic1.mp3" loop></audio>
+    <button id="musicBtn">播放音樂</button>
+    <button id="updateMusicBtn">更新音樂</button>
   </div>
-
-  <div id="winner">尚未開始抽獎</div>
 
   <script>
     // ============================
-    // 全域變數
+    // 參數與全域變數
     // ============================
-    const SCRIPT_URL = "-----------抽獎表單的網址------------"; // 替換成您的 Web App URL
-    const canvas = document.getElementById('wheelCanvas');
-    const ctx = canvas.getContext('2d');
-    const fetchBtn = document.getElementById('fetchBtn');
-    const spinBtn = document.getElementById('spinBtn');
-    const winnerDiv = document.getElementById('winner');
+    const SCRIPT_URL = "https://docs.google.com/spreadsheets/d/1QLqJHMEWt1BnIOfxpxv_wiAkFp9i0_bSmNAGj8Mqe98";
+    const COL_B_NAME = "區域(例如:中和1區)";
+    const COL_C_NAME = "您的姓名";
 
     let participants = [];
-    let startAngle = 0;
-    let arc;
-    let spinTimeout = null;
-    let spinAngleStart = 0;
-    let spinTime = 0;
-    let spinTimeTotal = 0;
 
     // ============================
-    // 從 Google 試算表載入名單
+    // 事件監聽與按鈕操作
     // ============================
-    async function fetchParticipants() {
+    // 載入最新名單按鈕
+    document.getElementById('fetchBtn').addEventListener('click', async () => {
+      document.getElementById('fetchBtn').style.display = 'none';
+      const winnerDiv = document.getElementById('winner');
+      winnerDiv.textContent = "載入中...";
+      const rawData = await fetchDataFromSheet();
+      if (rawData.length === 0) {
+        winnerDiv.textContent = "試算表目前沒有任何資料。";
+        document.getElementById('fetchBtn').style.display = 'block';
+        return;
+      }
+
+      // 處理資料過濾，並將參加者存儲
+      participants = rawData.filter(item => item[COL_B_NAME] && item[COL_C_NAME])
+        .map(item => ({ name: item[COL_C_NAME], region: item[COL_B_NAME] }));
+
+      winnerDiv.textContent = `已載入 ${participants.length} 位參加者。`;
+      document.getElementById('fetchBtn').style.display = 'block';
+      generateWheel();  // 生成轉盤
+    });
+
+    // 抽獎按鈕
+    document.getElementById('drawBtn').addEventListener('click', () => {
+      const winnerDiv = document.getElementById('winner');
+      if (participants.length === 0) {
+        winnerDiv.textContent = "名單已抽完或尚未載入。";
+        return;
+      }
+
+      // 只抽出一位
+      const winnerIndex = Math.floor(Math.random() * participants.length);
+      const winner = participants[winnerIndex];
+
+      // 讓轉盤開始旋轉
+      const wheel = document.getElementById('wheel');
+      wheel.style.transition = 'transform 3s ease-out';
+      const randomDegree = Math.floor(Math.random() * 360);
+      wheel.style.transform = `rotate(${randomDegree + 3600}deg)`; // 旋轉多圈，模擬隨機結果
+
+      // 在旋轉結束後顯示中獎者
+      setTimeout(() => {
+        winnerDiv.innerHTML = `本次中獎：<span>${winner.region} / ${winner.name}</span>`;
+        // 刪除已中獎者
+        participants.splice(winnerIndex, 1);
+      }, 3000); // 3秒後顯示結果
+    });
+
+    // ============================
+    // 轉盤生成
+    // ============================
+    function generateWheel() {
+      const wheel = document.getElementById('wheel');
+      wheel.innerHTML = '';  // 清空轉盤
+
+      const slots = participants.length;
+      const anglePerSlot = 360 / slots;
+      participants.forEach((participant, index) => {
+        const angle = anglePerSlot * index;
+
+        const slot = document.createElement('div');
+        slot.classList.add('wheel-slot');
+        slot.style.transform = `rotate(${angle}deg)`;
+        slot.innerHTML = `<span>${participant.name}</span>`;
+        wheel.appendChild(slot);
+      });
+    }
+
+    // ============================
+    // 背景音樂控制
+    // ============================
+    const bgMusic = document.getElementById('bgMusic');
+    const musicBtn = document.getElementById('musicBtn');
+    musicBtn.addEventListener('click', () => {
+      if (bgMusic.paused) {
+        bgMusic.play();
+        musicBtn.textContent = "暫停音樂";
+      } else {
+        bgMusic.pause();
+        musicBtn.textContent = "播放音樂";
+      }
+    });
+
+    // ============================
+    // 與後端溝通與資料存取
+    // ============================
+    async function fetchDataFromSheet() {
       try {
         const resp = await fetch(SCRIPT_URL);
         if (!resp.ok) throw new Error("讀取名單失敗: " + resp.status);
         const data = await resp.json();
-        participants = data.map(row => row["您的姓名"]).filter(name => name); // 假設欄位名稱為「您的姓名」
-        if (participants.length > 0) {
-          arc = Math.PI / (participants.length / 2);
-          drawWheel();
-          spinBtn.disabled = false;
-          winnerDiv.textContent = `名單載入完成，共 ${participants.length} 位參加者`;
-        } else {
-          winnerDiv.textContent = '無法載入參加者名單';
-        }
+        if (!Array.isArray(data)) return [];
+        return data;
       } catch (err) {
-        console.error("fetchParticipants error:", err);
-        winnerDiv.textContent = '載入名單失敗';
+        console.error("fetchDataFromSheet error:", err);
+        return [];
       }
     }
-
-    // ============================
-    // 繪製轉盤
-    // ============================
-    function drawWheel() {
-      const outsideRadius = 200;
-      const textRadius = 160;
-      const insideRadius = 50;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (let i = 0; i < participants.length; i++) {
-        const angle = startAngle + i * arc;
-        ctx.fillStyle = i % 2 === 0 ? "#FF5733" : "#33C3FF";
-
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, outsideRadius, angle, angle + arc, false);
-        ctx.arc(canvas.width / 2, canvas.height / 2, insideRadius, angle + arc, angle, true);
-        ctx.fill();
-
-        ctx.save();
-        ctx.fillStyle = "#fff";
-        ctx.translate(
-          canvas.width / 2 + Math.cos(angle + arc / 2) * textRadius,
-          canvas.height / 2 + Math.sin(angle + arc / 2) * textRadius
-        );
-        ctx.rotate(angle + arc / 2);
-        const text = participants[i];
-        ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
-        ctx.restore();
-      }
-    }
-
-    // ============================
-    // 旋轉轉盤
-    // ============================
-    function rotateWheel() {
-      spinTime += 30;
-      if (spinTime >= spinTimeTotal) {
-        stopRotateWheel();
-        return;
-      }
-      const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
-      startAngle += (spinAngle * Math.PI) / 180;
-      drawWheel();
-      spinTimeout = requestAnimationFrame(rotateWheel);
-    }
-
-    function stopRotateWheel() {
-      cancelAnimationFrame(spinTimeout);
-      const degrees = (startAngle * 180) / Math.PI + 90;
-      const arcd = (arc * 180) / Math.PI;
-      const index = Math.floor((360 - (degrees % 360)) / arcd) % participants.length;
-
-      winnerDiv.textContent = `恭喜中獎者：${participants[index]}`;
-    }
-
-    function easeOut(t, b, c, d) {
-      const ts = (t /= d) * t;
-      const tc = ts * t;
-      return b + c * (tc + -3 * ts + 3 * t);
-    }
-
-    // ============================
-    // 事件監聽
-    // ============================
-    fetchBtn.addEventListener('click', fetchParticipants);
-
-    spinBtn.addEventListener('click', () => {
-      spinAngleStart = Math.random() * 10 + 10;
-      spinTime = 0;
-      spinTimeTotal = Math.random() * 3000 + 4000;
-      rotateWheel();
-    });
   </script>
 </body>
 </html>
